@@ -1,0 +1,55 @@
+# Build artifacts
+*.so
+*.o
+*.a
+bench/bench_alloc_patterns
+sampler/libsampler.so
+stateless-sampling/bench/bench_alloc_patterns
+stateless-sampling/sampler/libsampler.so
+
+# Temporary numeric files (PID files, etc)
+.[0-9]*
+.[0-9][0-9]*
+.[0-9][0-9][0-9]*
+.[0-9][0-9][0-9][0-9]*
+.[0-9][0-9][0-9][0-9][0-9]*
+.[0-9][0-9][0-9][0-9][0-9][0-9]*
+
+# Temporary and log files
+*.log
+*.json.*
+*.tmp
+*~
+*.swp
+*.pid
+
+# Results and runtime data
+results_real_world/
+results/plots/
+nginx_prefix/
+nginx_root/
+
+# Dependencies (built from source)
+deps/
+curl/
+
+# Config and cache files
+config.log
+config.status
+autom4te.cache/
+*.cache
+
+# Old single-run stats
+stats_*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
