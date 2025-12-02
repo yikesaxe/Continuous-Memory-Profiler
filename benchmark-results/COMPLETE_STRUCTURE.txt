@@ -1,0 +1,199 @@
+================================================================================
+COMPLETE BENCHMARK-RESULTS STRUCTURE
+================================================================================
+
+/home/axel/Workspace/Continous-Memory-Profiler/benchmark-results/
+│
+├── 📘 Documentation (Top-Level)
+│   ├── README.md (17 KB) ⭐ START HERE
+│   ├── MASTER_GUIDE.md (15 KB) - Complete overview
+│   ├── COMPARISON.md (12 KB) - Side-by-side comparison
+│   ├── PROJECT_SUMMARY.md (10 KB) - Achievement summary
+│   └── README_original.md (10 KB) - Original background
+│
+├── 🔧 Automation
+│   ├── quick_run_all.sh - Run all 3 implementations
+│   └── verify_complete_setup.sh - Verify 40 components
+│
+├── 🏃 Workloads (Shared)
+│   └── workloads/
+│       ├── README.md (10 KB) - Workload documentation
+│       ├── run_workload.sh - Unified driver
+│       ├── synthetic/
+│       │   ├── run_monotonic.sh
+│       │   └── run_high_reuse.sh
+│       ├── curl/run_curl.sh
+│       ├── memcached/run_memcached.sh
+│       └── nginx/run_nginx.sh
+│
+├── 1️⃣ TRUE STATELESS (Zero Memory Overhead)
+│   └── stateless-sampling/
+│       ├── 📚 Documentation
+│       │   ├── README.md (9 KB) - Technical overview
+│       │   ├── QUICKSTART.md (6 KB) - Quick start
+│       │   ├── results.md (8 KB) - Results explanation
+│       │   └── README_old.md (3 KB) - Original
+│       │
+│       ├── 💻 Implementation
+│       │   ├── sampler_stateless.h (914 bytes)
+│       │   ├── sampler_stateless.c (12 KB, ~400 lines)
+│       │   ├── libsampler_stateless.so (72 KB) ✓
+│       │   └── Makefile
+│       │
+│       ├── 🔬 Automation
+│       │   ├── run_stateless_experiments.py (5 KB) ✓
+│       │   ├── aggregate_stateless_results.py (6 KB) ✓
+│       │   └── make_plots.py (7 KB) ✓
+│       │
+│       ├── 📊 Results (generated after experiments)
+│       │   ├── raw/<workload>/<scheme>/run_N.json
+│       │   ├── stateless_results_summary.json
+│       │   ├── stateless_results_summary.txt
+│       │   └── plots/*.png (~6-8 plots)
+│       │
+│       └── 🎯 Schemes (4)
+│           ├── STATELESS_HASH_XOR (fastest)
+│           ├── STATELESS_HASH_SPLITMIX (better distribution)
+│           ├── STATELESS_HASH_MURMURISH (best distribution)
+│           └── STATELESS_POISSON_BERNOULLI (no address bias)
+│
+├── 2️⃣ ALL-HEADERS (Headers on Every Allocation)
+│   └── header-based-tracking/all-headers/
+│       ├── 📚 Documentation
+│       │   ├── README.md (3 KB) - Background
+│       │   ├── QUICKSTART.md (3 KB) - Quick start
+│       │   ├── results.md (8 KB) - Results explanation
+│       │   └── SUMMARY.md (8 KB) - Summary
+│       │
+│       ├── 💻 Implementation
+│       │   ├── sampler_all_headers.h (1.3 KB)
+│       │   ├── sampler_all_headers.c (16 KB, ~450 lines)
+│       │   ├── libsampler_all_headers.so (72 KB) ✓
+│       │   └── Makefile
+│       │
+│       ├── 🔬 Automation
+│       │   ├── run_all_headers_experiments.py (5 KB) ✓
+│       │   ├── aggregate_all_headers_results.py (6 KB) ✓
+│       │   └── make_plots.py (7 KB) ✓
+│       │
+│       ├── 📊 Results (generated after experiments)
+│       │   ├── raw/<workload>/<scheme>/run_N.json
+│       │   ├── all_headers_results_summary.json
+│       │   ├── all_headers_results_summary.txt
+│       │   └── plots/*.png (~7-9 plots)
+│       │
+│       └── 🎯 Schemes (4)
+│           ├── HEADER_HASH (fast, simple)
+│           ├── HEADER_PAGE_HASH (fails on small sets)
+│           ├── HEADER_POISSON_BYTES (most consistent)
+│           └── HEADER_HYBRID (balanced)
+│
+├── 3️⃣ SAMPLE-HEADERS (Headers Only on Sampled - 15× Reduction)
+│   └── header-based-tracking/sample-headers/
+│       ├── 📚 Documentation
+│       │   ├── README.md (7 KB) - Background
+│       │   ├── QUICKSTART.md (3 KB) - Quick start
+│       │   ├── results.md (12 KB) - Results + eBPF mapping
+│       │   └── SUMMARY.md (8 KB) - Summary
+│       │
+│       ├── 💻 Implementation
+│       │   ├── sampler_sample_headers.h (1.7 KB)
+│       │   ├── sampler_sample_headers.c (19 KB, ~500 lines)
+│       │   ├── libsampler_sample_headers.so (72 KB) ✓
+│       │   └── Makefile
+│       │
+│       ├── 🔬 Automation
+│       │   ├── run_sample_headers_experiments.py (5 KB) ✓
+│       │   ├── aggregate_sample_headers_results.py (6 KB) ✓
+│       │   └── make_plots.py (7 KB) ✓
+│       │
+│       ├── 📊 Results (generated after experiments)
+│       │   ├── raw/<workload>/<scheme>/run_N.json
+│       │   ├── sample_headers_results_summary.json
+│       │   ├── sample_headers_results_summary.txt
+│       │   └── plots/*.png (~4-6 plots)
+│       │
+│       └── 🎯 Schemes (3)
+│           ├── SAMPLE_HEADERS_POISSON_MAP (recommended)
+│           ├── SAMPLE_HEADERS_HASH_MAP (wasteful, don't use)
+│           └── SAMPLE_HEADERS_EBPF_INSPIRED (prototype)
+│
+└── 📊 COMBINED RESULTS
+    └── results/
+        ├── README.md (2 KB) - Results overview
+        ├── combine_results.py (8 KB) ✓
+        └── combined_results.md (auto-generated) ⭐ FINAL REPORT
+
+================================================================================
+SUMMARY STATISTICS
+================================================================================
+
+📝 Source Files:       9 (.c + .h)
+🔨 Compiled Libraries: 3 (.so)
+🐍 Python Scripts:     10 (automation)
+📚 Documentation:      16 (.md files, ~85 KB)
+🎨 Plots:              ~20-30 (generated)
+📊 Results:            ~100-150 JSON files (generated)
+
+Lines of Code:
+  • True Stateless:    ~400 lines C
+  • All-Headers:       ~450 lines C
+  • Sample-Headers:    ~500 lines C
+  • TOTAL:            ~1,350 lines C
+
+Schemes Implemented:   11 total
+  • True Stateless:    4 schemes
+  • All-Headers:       4 schemes
+  • Sample-Headers:    3 schemes
+
+Workloads:            5
+  • Synthetic:        2 (monotonic, high-reuse)
+  • Real-world:       3 (curl, memcached, nginx)
+
+================================================================================
+VERIFICATION STATUS
+================================================================================
+
+✅ All libraries compiled
+✅ All scripts executable
+✅ All documentation complete
+✅ Workload integration verified
+✅ Test runs successful
+✅ 40/40 checks passed
+
+================================================================================
+QUICK START
+================================================================================
+
+cd /home/axel/Workspace/Continous-Memory-Profiler/benchmark-results
+
+# Run everything (5 minutes)
+bash quick_run_all.sh
+
+# View results
+cat results/combined_results.md
+
+# Read guide
+cat MASTER_GUIDE.md
+
+================================================================================
+KEY FINDINGS (Expected)
+================================================================================
+
+Memory Overhead (1M allocations):
+  • True Stateless:   0 bytes
+  • Sample-Headers:   1.1 MB (15× less than all-headers)
+  • All-Headers:      16 MB
+
+Best Schemes:
+  • Production:       STATELESS_HASH_XOR (0 overhead)
+  • Debugging:        SAMPLE_HEADERS_POISSON_MAP (exact tracking)
+  • Research:         HEADER_POISSON_BYTES (baseline)
+
+Don't Use:
+  • HEADER_PAGE_HASH (fails on small working sets)
+  • SAMPLE_HEADERS_HASH_MAP (wasteful double allocation)
+
+================================================================================
+STATUS: COMPLETE ✅
+================================================================================

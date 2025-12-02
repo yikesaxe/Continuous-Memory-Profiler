@@ -1,0 +1,70 @@
+================================================================================
+Stateless Sampling Experiments - Results Summary
+================================================================================
+
+
+================================================================================
+Workload: HIGH-REUSE
+================================================================================
+
+Scheme: STATELESS_HASH_MURMURISH
+  Runs: 10
+  Total Allocations: 9862
+  Sample Rate (allocs): 0.003285 ± 0.002417 [p50: 0.003341, p95: 0.007176]
+  Sample Rate (bytes): 0.004490 ± 0.003757 [p50: 0.004964, p95: 0.009791]
+  Dead Zone Rate: 0.2000 ± 0.4216
+
+Scheme: STATELESS_HASH_SPLITMIX
+  Runs: 10
+  Total Allocations: 9862
+  Sample Rate (allocs): 0.005099 ± 0.003611 [p50: 0.004563, p95: 0.015826]
+  Sample Rate (bytes): 0.006278 ± 0.004585 [p50: 0.005614, p95: 0.021626]
+  Dead Zone Rate: 0.1000 ± 0.3162
+
+Scheme: STATELESS_HASH_XOR
+  Runs: 10
+  Total Allocations: 9848
+  Sample Rate (allocs): 0.005311 ± 0.004572 [p50: 0.005534, p95: 0.011963]
+  Sample Rate (bytes): 0.004504 ± 0.005541 [p50: 0.002818, p95: 0.020160]
+  Dead Zone Rate: 0.3000 ± 0.4830
+
+Scheme: STATELESS_POISSON_BERNOULLI
+  Runs: 10
+  Total Allocations: 9862
+  Sample Rate (allocs): 0.032549 ± 0.001700 [p50: 0.032549, p95: 0.035327]
+  Sample Rate (bytes): 0.044751 ± 0.003667 [p50: 0.044362, p95: 0.053589]
+  Dead Zone Rate: 0.0000 ± 0.0000
+
+
+================================================================================
+Workload: MONOTONIC
+================================================================================
+
+Scheme: STATELESS_HASH_MURMURISH
+  Runs: 10
+  Total Allocations: 10004
+  Sample Rate (allocs): 0.003789 ± 0.000738 [p50: 0.003749, p95: 0.005178]
+  Sample Rate (bytes): 0.003727 ± 0.000792 [p50: 0.003499, p95: 0.005145]
+  Dead Zone Rate: 0.0000 ± 0.0000
+
+Scheme: STATELESS_HASH_SPLITMIX
+  Runs: 10
+  Total Allocations: 10004
+  Sample Rate (allocs): 0.003858 ± 0.000835 [p50: 0.003798, p95: 0.006193]
+  Sample Rate (bytes): 0.003893 ± 0.000621 [p50: 0.003908, p95: 0.005125]
+  Dead Zone Rate: 0.0000 ± 0.0000
+
+Scheme: STATELESS_HASH_XOR
+  Runs: 10
+  Total Allocations: 10004
+  Sample Rate (allocs): 0.004298 ± 0.000921 [p50: 0.004698, p95: 0.005343]
+  Sample Rate (bytes): 0.004300 ± 0.000885 [p50: 0.004575, p95: 0.005446]
+  Dead Zone Rate: 0.0000 ± 0.0000
+
+Scheme: STATELESS_POISSON_BERNOULLI
+  Runs: 10
+  Total Allocations: 10004
+  Sample Rate (allocs): 0.367763 ± 0.002676 [p50: 0.367303, p95: 0.372491]
+  Sample Rate (bytes): 0.472785 ± 0.002703 [p50: 0.472013, p95: 0.482009]
+  Dead Zone Rate: 0.0000 ± 0.0000
+

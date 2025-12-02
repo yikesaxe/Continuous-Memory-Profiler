@@ -1,0 +1,76 @@
+================================================================================
+All-Headers Sampling Experiments - Results Summary
+================================================================================
+
+
+================================================================================
+Workload: HIGH-REUSE
+================================================================================
+
+Scheme: HEADER_HASH
+  Runs: 10
+  Total Allocations: 9848
+  Sample Rate (allocs): 0.002813 ± 0.002625 [p50: 0.002843, p95: 0.009029]
+  Sample Rate (bytes): 0.002810 ± 0.003628
+  Dead Zone Rate: 0.3000 ± 0.4830
+
+Scheme: HEADER_HYBRID
+  Runs: 10
+  Total Allocations: 9848
+  Sample Rate (allocs): 0.031023 ± 0.000804 [p50: 0.031023, p95: 0.031786]
+  Sample Rate (bytes): 0.039806 ± 0.001706
+  Dead Zone Rate: 0.0000 ± 0.0000
+
+Scheme: HEADER_PAGE_HASH
+  Runs: 10
+  Total Allocations: 9848
+  Sample Rate (allocs): 0.000000 ± 0.000000 [p50: 0.000000, p95: 0.000000]
+  Sample Rate (bytes): 0.000000 ± 0.000000
+  Dead Zone Rate: 1.0000 ± 0.0000
+  Page Coverage: 0.0000 ± 0.0000
+  Unique Pages: 10
+  Sampled Pages: 0
+
+Scheme: HEADER_POISSON_BYTES
+  Runs: 10
+  Total Allocations: 9848
+  Sample Rate (allocs): 0.031429 ± 0.000805 [p50: 0.031429, p95: 0.032193]
+  Sample Rate (bytes): 0.041826 ± 0.004604
+  Dead Zone Rate: 0.0000 ± 0.0000
+
+
+================================================================================
+Workload: MONOTONIC
+================================================================================
+
+Scheme: HEADER_HASH
+  Runs: 10
+  Total Allocations: 10004
+  Sample Rate (allocs): 0.003599 ± 0.000700 [p50: 0.003549, p95: 0.005403]
+  Sample Rate (bytes): 0.003525 ± 0.001051
+  Dead Zone Rate: 0.0000 ± 0.0000
+
+Scheme: HEADER_HYBRID
+  Runs: 10
+  Total Allocations: 10004
+  Sample Rate (allocs): 0.004788 ± 0.000612 [p50: 0.004748, p95: 0.005598]
+  Sample Rate (bytes): 0.003789 ± 0.000794
+  Dead Zone Rate: 0.0000 ± 0.0000
+
+Scheme: HEADER_PAGE_HASH
+  Runs: 10
+  Total Allocations: 10004
+  Sample Rate (allocs): 0.004018 ± 0.000370 [p50: 0.003998, p95: 0.004878]
+  Sample Rate (bytes): 0.003898 ± 0.000267
+  Dead Zone Rate: 0.0000 ± 0.0000
+  Page Coverage: 0.0048 ± 0.0001
+  Unique Pages: 4096
+  Sampled Pages: 20
+
+Scheme: HEADER_POISSON_BYTES
+  Runs: 10
+  Total Allocations: 10004
+  Sample Rate (allocs): 0.364904 ± 0.005110 [p50: 0.364904, p95: 0.369752]
+  Sample Rate (bytes): 0.468873 ± 0.006438
+  Dead Zone Rate: 0.0000 ± 0.0000
+

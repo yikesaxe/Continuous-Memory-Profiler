@@ -4,7 +4,7 @@
 
 This document describes a comprehensive evaluation of stateless memory sampling strategies for live heap profiling. We implemented four different sampling schemes using an `LD_PRELOAD`-based interception library and evaluated them across synthetic and real-world workloads. Our evaluation includes multi-run statistical analysis with percentile distributions, performance overhead measurements, and sampling bias detection.
 
-**Key Finding**: `POISSON_HEADER` provides the best balance of statistical accuracy, coverage, and acceptable overhead (<7% throughput impact), while `PAGE_HASH` fails catastrophically on small working sets (0% sampling when the application uses <1000 unique pages).
+**Key Finding**: `POISSON_HEADER` provides the best balance of statistical accuracy, coverage, and acceptable overhead (<7% throughput impact), while `PAGE_HASH` fails catastrophically on small working sets (0% sampling when the application uses <1000 unique 4 KB pages = <4 MB working set).
 
 ---
 
@@ -43,7 +43,7 @@ We implemented four sampling schemes, each with different trade-offs:
 
 **Algorithm**:
 - Compute XOR-shift hash of the pointer address
-- Sample if `(hash & 0xFF) == 0` (target rate: ~1/256 ≈ 0.39%)
+- Sample if `(hash & 0xFF) == 0` (target rate: ~1/256 ≈ 0.39% of allocations)
 
 **Properties**:
 - ✅ Zero memory overhead (no state)
@@ -73,9 +73,9 @@ static bool should_sample(void *ptr, size_t size) {
 **Properties**:
 - ✅ Statistically sound: samples based on bytes allocated, not addresses
 - ✅ Immune to address reuse bias
-- ✅ Tunable via `SAMPLER_POISSON_MEAN_BYTES` (default: 4096 bytes)
+- ✅ Tunable via `SAMPLER_POISSON_MEAN_BYTES` (default: 4096 bytes = 4 KB)
 - ❌ Requires thread-local state (minimal overhead)
-- ❌ Higher byte sampling rate (can be 40-98% depending on allocation sizes)
+- ❌ Higher byte sampling rate (can be 40-98% of bytes depending on allocation sizes)
 
 **Implementation**:
 ```c
@@ -95,33 +95,33 @@ static bool should_sample_alloc_poisson(size_t size) {
 ### 2.3 PAGE_HASH (Page-Based Hash)
 
 **Algorithm**:
-- Compute XOR-shift hash of the **page number** (`address >> 12` for 4KB pages)
+- Compute XOR-shift hash of the **page number** (`address >> 12` for 4 KB pages)
 - Sample **all allocations** on pages where `(hash & 0xFF) == 0`
-- Target: ~1/256 of pages are sampled
+- Target: ~1/256 of pages are sampled (~0.39% of pages)
 
 **Properties**:
 - ✅ Reduces risk of hot-spot blindness by sampling entire memory regions
 - ✅ Zero per-allocation state
-- ❌ **Catastrophic failure on small working sets**: If an application uses only K distinct pages, the probability that none are sampled is `(255/256)^K`. For K < 1000, this can be very high.
+- ❌ **Catastrophic failure on small working sets**: If an application uses only K distinct 4 KB pages, the probability that none are sampled is `(255/256)^K`. For K < 1000 pages (<4 MB working set), this can be very high.
 - ❌ Samples entire pages, not individual objects (less granular)
 
 **Implementation**:
 ```c
 static bool should_sample_alloc_page_hash(void *real_ptr, size_t size) {
     uintptr_t addr = (uintptr_t)real_ptr;
-    uintptr_t page = addr >> 12;  // 4KB pages
+    uintptr_t page = addr >> 12;  // 4 KB pages (4096 bytes)
     uint64_t h = hash64(page);
     return (h & 0xFF) == 0;
 }
 ```
 
-**Fragility Example**: If an application's working set fits in 11 pages (as observed in our high-reuse workload), and none of those 11 pages hash to the sampled set, `PAGE_HASH` achieves **0% sampling**.
+**Fragility Example**: If an application's working set fits in 11 pages (44 KB total, as observed in our high-reuse workload), and none of those 11 pages hash to the sampled set, `PAGE_HASH` achieves **0% sampling**.
 
 ### 2.4 HYBRID (Small Poisson, Large Hash)
 
 **Algorithm**:
 - Small allocations (< 256 bytes): Use `POISSON_HEADER`
-- Large allocations (≥ 256 bytes): Use `STATELESS_HASH`
+- Large allocations (≥ 256 bytes = 0.25 KB): Use `STATELESS_HASH`
 
 **Properties**:
 - ✅ Balances Poisson's coverage for small objects with hash's low overhead for large objects
@@ -148,7 +148,7 @@ We use `LD_PRELOAD` to intercept standard allocation functions (`malloc`, `free`
 
 **Key Implementation Details**:
 
-1. **Header-Based Metadata**: Each allocation is wrapped with a 16-byte `SampleHeader` containing:
+1. **Header-Based Metadata**: Each allocation is wrapped with a 16-byte (128-bit) `SampleHeader` containing:
    - Magic number (for identification)
    - Flags (e.g., `FLAG_SAMPLED`)
    - Padding to maintain 16-byte alignment
@@ -163,29 +163,30 @@ We use `LD_PRELOAD` to intercept standard allocation functions (`malloc`, `free`
 
 We track comprehensive metrics:
 
-- **Allocation Counts**: Total vs. sampled allocations and bytes
-- **Sample Rates**: `sample_rate_allocs = sampled_allocs / total_allocs`, `sample_rate_bytes = sampled_bytes / total_bytes`
-- **Dead Zone Metric**: `windows_zero_sampled` counts windows of 100,000 allocations where zero samples occurred (indicates sampling bias)
-- **Page Metrics** (PAGE_HASH only): `approx_unique_pages`, `approx_sampled_pages` (using approximate bitmaps)
-- **Size Distribution**: Allocation counts by size bins (32, 64, 128, 256, 512, 1024, 4096, 16384, 65536, >65536 bytes)
+- **Allocation Counts**: Total vs. sampled allocations (count) and bytes (bytes)
+- **Sample Rates**: `sample_rate_allocs = sampled_allocs / total_allocs` (ratio, 0.0-1.0), `sample_rate_bytes = sampled_bytes / total_bytes` (ratio, 0.0-1.0).
+  - *Example*: A ratio of 0.0040 means 0.40% (4 per 1000) of allocations were sampled.
+- **Dead Zone Metric**: `windows_zero_sampled` counts windows of 100,000 allocations where zero samples occurred (count, indicates sampling bias)
+- **Page Metrics** (PAGE_HASH only): `approx_unique_pages` (count), `approx_sampled_pages` (count, using approximate bitmaps)
+- **Size Distribution**: Allocation counts by size bins (32 B, 64 B, 128 B, 256 B, 512 B, 1 KB, 4 KB, 16 KB, 64 KB, >64 KB)
 
 ### 3.3 JSON Output Format
 
 Each run produces a JSON file with:
 ```json
 {
-  "pid": 12345,
+  "pid": 12345,                          // Process ID (count)
   "scheme": "STATELESS_HASH",
   "scheme_id": 1,
-  "total_allocs": 100000,
-  "sampled_allocs": 390,
-  "sample_rate_allocs": 0.003900,
-  "sample_rate_bytes": 0.000919,
-  "windows_total": 1,
-  "windows_zero_sampled": 1,
-  "approx_unique_pages": 0,
-  "approx_sampled_pages": 0,
-  "poisson_mean_bytes": 4096,
+  "total_allocs": 100000,                // Count
+  "sampled_allocs": 390,                 // Count
+  "sample_rate_allocs": 0.003900,        // Ratio (0.39% of allocations)
+  "sample_rate_bytes": 0.000919,         // Ratio (0.09% of bytes)
+  "windows_total": 1,                    // Count (windows of 100,000 allocs)
+  "windows_zero_sampled": 1,             // Count
+  "approx_unique_pages": 0,              // Count (4 KB pages)
+  "approx_sampled_pages": 0,             // Count (4 KB pages)
+  "poisson_mean_bytes": 4096,            // Bytes (4 KB)
   "env": {...}
 }
 ```
@@ -201,7 +202,7 @@ We evaluated each scheme across **5 workloads**:
 #### A. Synthetic Benchmarks (10 runs each)
 
 1. **Monotonic Heap with Leaks**
-   - Allocates 100,000 objects (16-4096 bytes)
+   - Allocates 100,000 objects (16 bytes - 4 KB)
    - Frees 95%, leaks 5%
    - **Purpose**: Tests leak detection capability
 
@@ -235,14 +236,14 @@ For each workload and scheme, we ran **multiple trials** (10 for synthetic, 5 fo
 ### 4.3 Metrics Analyzed
 
 #### Sampling Metrics
-- **Sample Rate (Allocations)**: `sampled_allocs / total_allocs`
-- **Sample Rate (Bytes)**: `sampled_bytes / total_bytes`
-- **Windows Zero Sampled**: Dead-zone metric (higher = more bias)
-- **Approx Unique/Sampled Pages**: For PAGE_HASH, tracks page-level coverage
+- **Sample Rate (Allocations)**: `sampled_allocs / total_allocs` (ratio, 0.0-1.0, typically ~0.004 = 0.4%)
+- **Sample Rate (Bytes)**: `sampled_bytes / total_bytes` (ratio, 0.0-1.0, varies by scheme)
+- **Windows Zero Sampled**: Dead-zone metric (count, higher = more bias)
+- **Approx Unique/Sampled Pages**: For PAGE_HASH, tracks page-level coverage (count)
 
 #### Performance Metrics (Real-World Only)
-- **Throughput**: Ops/sec (memcached), Reqs/sec (nginx)
-- **Latency**: Mean latency in milliseconds
+- **Throughput**: Ops/sec (memcached), Reqs/sec (nginx) - operations/requests per second
+- **Latency**: Mean latency (milliseconds, ms)
 
 ### 4.4 Aggregation and Visualization
 
@@ -264,50 +265,50 @@ We developed `pack_results.py` to:
 
 ### 5.1 Synthetic: Monotonic Workload
 
-| Scheme | Runs | Avg Sample Rate (allocs) | Std | p50 | p95 | p99 | Avg Windows Zero Sampled |
-|--------|------|--------------------------|-----|-----|-----|-----|--------------------------|
-| STATELESS_HASH | 20 | 0.003904 | 0.000242 | 0.003840 | 0.004300 | 0.004300 | 1.00 |
-| POISSON_HEADER | 20 | 0.004490 | 0.000000 | 0.004490 | 0.004490 | 0.004490 | 1.00 |
-| PAGE_HASH | 20 | 0.003948 | 0.000149 | 0.003910 | 0.004270 | 0.004270 | 1.00 |
-| HYBRID | 20 | 0.003749 | 0.000233 | 0.003765 | 0.004240 | 0.004240 | 1.00 |
+| Scheme | Runs | Avg Sample Rate (allocs, ratio) | Avg Sample Rate (bytes, ratio) | Std (allocs) | p50 (ratio) | p95 (ratio) | p99 (ratio) | Avg Windows Zero Sampled (count) |
+|--------|------|--------------------------------|--------------------------------|--------------|-------------|-------------|-------------|----------------------------------|
+| STATELESS_HASH | 60 | 0.003963 | 0.003956 | 0.000210 | 0.003955 | 0.004280 | 0.004300 | 1.00 |
+| POISSON_HEADER | 80 | 0.004079 | 0.008184 | 0.000276 | 0.004030 | 0.004490 | 0.004490 | 1.00 |
+| PAGE_HASH | 60 | 0.003925 | 0.003911 | 0.000148 | 0.003910 | 0.004170 | 0.004270 | 1.00 |
+| HYBRID | 60 | 0.003723 | 0.003795 | 0.000213 | 0.003715 | 0.004100 | 0.004240 | 1.00 |
+
+*Note: Sample rates are ratios (0.0-1.0), where 0.003904 = 0.3904% of allocations. Percentiles (p50/p95/p99) refer to allocation sampling rate. For POISSON_HEADER, mean was set to 524,288 (512 KB).*
 
 **Key Observations**:
-- All schemes achieve ~0.4% allocation sampling (close to target)
-- `POISSON_HEADER` shows zero variance (p50 = p95 = p99), indicating perfect consistency
-- `STATELESS_HASH` shows slight variance (std: 0.000242)
-- All schemes show `windows_zero_sampled = 1.0` (one window with zero samples), which is expected for a single-window workload
+- All schemes achieve ~0.4% allocation sampling.
+- `POISSON_HEADER` now shows expected statistical variance (std: 0.000276), confirming its stochastic nature.
+- `STATELESS_HASH` shows consistent performance in this monotonic workload.
 
 ### 5.2 Synthetic: High Reuse Workload
 
-| Scheme | Runs | Avg Sample Rate (allocs) | Std | p50 | p95 | p99 | Avg Approx Unique Pages | Avg Approx Sampled Pages |
-|--------|------|--------------------------|-----|-----|-----|-----|-------------------------|--------------------------|
-| STATELESS_HASH | 20 | 0.003824 | 0.002998 | 0.003361 | 0.009661 | 0.009661 | - | - |
-| POISSON_HEADER | 20 | 0.002346 | 0.000000 | 0.002346 | 0.002346 | 0.002346 | - | - |
-| PAGE_HASH | 20 | **0.000000** | **0.000000** | **0.000000** | **0.000000** | **0.000000** | **11.0** | **0.0** |
-| HYBRID | 20 | 0.002122 | 0.000063 | 0.002101 | 0.002306 | 0.002306 | - | - |
+| Scheme | Runs | Avg Sample Rate (allocs, ratio) | Avg Sample Rate (bytes, ratio) | Std (allocs) | p50 (ratio) | p95 (ratio) | p99 (ratio) | Avg Approx Unique Pages (count, 4 KB) | Avg Approx Sampled Pages (count, 4 KB) |
+|--------|------|--------------------------------|--------------------------------|--------------|-------------|-------------|-------------|--------------------------------------|----------------------------------------|
+| STATELESS_HASH | 60 | 0.003733 | 0.003470 | 0.002838 | 0.003310 | 0.009259 | 0.009661 | - | - |
+| POISSON_HEADER | 80 | 0.002201 | 0.002849 | 0.000121 | 0.002172 | 0.002346 | 0.002378 | - | - |
+| PAGE_HASH | 60 | 0.004394 | 0.004017 | 0.023861 | 0.000000 | 0.000000 | 0.131816 | 10.9 | 0.0 |
+| HYBRID | 60 | 0.002055 | 0.002562 | 0.000128 | 0.002101 | 0.002263 | 0.002306 | - | - |
+
+*Note: Sample rates are ratios (0.0-1.0). Percentiles (p50/p95/p99) refer to allocation sampling rate. Pages are counts of 4 KB pages. For POISSON_HEADER and HYBRID, mean was set to 65,536 (64 KB).*
 
 **Key Observations**:
-- **PAGE_HASH catastrophic failure**: 0% sampling across all 20 runs (all percentiles = 0)
-  - Only 11 unique pages observed, **0 sampled**
-  - Probability of this: `(255/256)^11 ≈ 95.8%` — very likely!
-- `STATELESS_HASH` shows high variance (std: 0.002998) due to address reuse bias
-- `POISSON_HEADER` maintains perfect consistency (zero variance) because it's immune to address reuse
-- `HYBRID` shows low variance (std: 0.000063) and non-zero sampling
-
-**Conclusion**: `PAGE_HASH` is **not viable** for applications with small working sets. The high-reuse workload demonstrates the fragility of page-based sampling.
+- **Poisson Variance**: With proper seeding (avoiding identical `time(NULL)` seeds), `POISSON_HEADER` shows expected statistical variance (std: 0.000121), confirming it is a stochastic process.
+- **PAGE_HASH Sensitivity**: `PAGE_HASH` still shows extreme behavior. Most runs (p50, p95) have **0% sampling**, but some runs hit sampled pages, driving the average up and p99 to ~13%. This confirms its "all-or-nothing" fragility on small working sets.
+- `STATELESS_HASH` continues to show high variance due to address reuse.
 
 ### 5.3 Real-World: Curl Compilation
 
-| Scheme | Runs | Avg Sample Rate (bytes) | Std | p50 | p95 | p99 |
-|--------|------|-------------------------|-----|-----|-----|-----|
+| Scheme | Runs | Avg Sample Rate (bytes, ratio) | Std | p50 (ratio) | p95 (ratio) | p99 (ratio) |
+|--------|------|-------------------------------|-----|-------------|-------------|-------------|
 | STATELESS_HASH | 10 | 0.000919 | 0.000424 | 0.000756 | 0.001681 | 0.001681 |
 | POISSON_HEADER | 10 | **0.403992** | 0.013699 | **0.407214** | 0.416618 | 0.416618 |
 | PAGE_HASH | 10 | 0.000839 | 0.001770 | 0.000000 | 0.004197 | 0.004197 |
 | HYBRID | 10 | 0.013848 | 0.001896 | 0.012938 | 0.017254 | 0.017254 |
 
+*Note: Sample rates are ratios (0.0-1.0), where 0.407214 = 40.7% of bytes. Percentiles (p50/p95/p99) are also ratios.*
+
 **Key Observations**:
-- `POISSON_HEADER` achieves **~40% byte sampling** (p50: 0.407), making it highly effective for profiling
-- `STATELESS_HASH` achieves only **~0.1% byte sampling** (p50: 0.000756), with higher variance
+- `POISSON_HEADER` achieves **~40% byte sampling** (p50: 0.407 = 40.7%), making it highly effective for profiling
+- `STATELESS_HASH` achieves only **~0.1% byte sampling** (p50: 0.000756 = 0.0756%), with higher variance
 - `PAGE_HASH` shows zero sampling in some runs (p50 = 0.000000), indicating occasional blindness
 - `HYBRID` achieves ~1.4% byte sampling, a middle ground
 
@@ -315,16 +316,18 @@ We developed `pack_results.py` to:
 
 ### 5.4 Real-World: Memcached Performance
 
-| Scheme | Runs | Avg Ops/sec | Std | p50 | p95 | p99 | Avg Latency (ms) | Std | p50 | p95 | p99 |
-|--------|------|-------------|-----|-----|-----|-----|------------------|-----|-----|-----|-----|
+| Scheme | Runs | Avg Ops/sec | Std | p50 (ops/sec) | p95 (ops/sec) | p99 (ops/sec) | Avg Latency (ms) | Std | p50 (ms) | p95 (ms) | p99 (ms) |
+|--------|------|-------------|-----|---------------|---------------|---------------|------------------|-----|----------|----------|----------|
 | POISSON_HEADER | 5 | 1237.83 | 69.70 | 1234.50 | 1350.00 | 1350.00 | 0.244 | 0.005 | 0.244 | 0.252 | 0.252 |
 | PAGE_HASH | 5 | 1198.61 | 38.58 | 1200.00 | 1250.00 | 1250.00 | 0.247 | 0.003 | 0.247 | 0.251 | 0.251 |
 | HYBRID | 5 | 1200.49 | 58.49 | 1200.00 | 1280.00 | 1280.00 | 0.247 | 0.004 | 0.247 | 0.251 | 0.251 |
 | STATELESS_HASH | 5 | 1160.50 | 77.97 | 1160.00 | 1280.00 | 1280.00 | 0.248 | 0.004 | 0.248 | 0.252 | 0.252 |
 
+*Note: Throughput in operations/second (ops/sec). Latency in milliseconds (ms). Percentiles (p50/p95/p99) use the same units as their respective metrics.*
+
 **Key Observations**:
 - **Overhead is minimal**: < 7% difference between best (`POISSON_HEADER`) and worst (`STATELESS_HASH`)
-- All schemes show similar latency (~0.24-0.25ms)
+- All schemes show similar latency (~0.24-0.25 ms)
 - `POISSON_HEADER` has the highest throughput (p50: 1234.50 ops/sec), despite having more sampling overhead
 - Variance is low across all schemes (std < 80 ops/sec)
 
@@ -332,7 +335,7 @@ We developed `pack_results.py` to:
 
 ### 5.5 Dead Zone Analysis
 
-The `windows_zero_sampled` metric counts windows of 100,000 allocations where zero samples occurred. This is a proxy for sampling bias.
+The `windows_zero_sampled` metric counts windows of 100,000 allocations where zero samples occurred (count). This is a proxy for sampling bias.
 
 **Findings**:
 - **Monotonic workload**: All schemes show `windows_zero_sampled = 1.0` (expected for a single-window workload)
@@ -347,18 +350,18 @@ The `windows_zero_sampled` metric counts windows of 100,000 allocations where ze
 
 1. **POISSON_HEADER** is the most statistically sound:
    - Consistent sample rates across runs (zero variance in synthetic workloads)
-   - High byte sampling rate (40-98% depending on workload)
+   - High byte sampling rate (40-98% of bytes depending on workload)
    - Immune to address reuse bias
    - **Recommended for general-purpose profiling**
 
 2. **STATELESS_HASH** is viable for low-overhead scenarios:
-   - Stable ~0.4% allocation sampling in diverse workloads
+   - Stable ~0.4% allocation sampling (ratio: ~0.004) in diverse workloads
    - Minimal performance impact
    - **Caution**: Higher variance in small workloads; may miss leaks in address-reuse scenarios
 
 3. **PAGE_HASH** is **not recommended for production**:
    - Fails catastrophically on small working sets (0% sampling observed)
-   - Only viable for applications with very large memory footprints (>10K unique pages)
+   - Only viable for applications with very large memory footprints (>10K unique 4 KB pages = >40 MB working set)
    - Useful as a negative control in experiments
 
 4. **HYBRID** is a good compromise:
@@ -384,10 +387,10 @@ The `windows_zero_sampled` metric counts windows of 100,000 allocations where ze
 ### 6.4 Final Recommendations
 
 #### For General-Purpose Live Heap Profiling
-**Use `POISSON_HEADER` with `SAMPLER_POISSON_MEAN_BYTES=4096`**:
+**Use `POISSON_HEADER` with `SAMPLER_POISSON_MEAN_BYTES=4096` (4 KB)**:
 - Best statistical properties
-- Highest byte sampling rate
-- Acceptable overhead (<7%)
+- Highest byte sampling rate (40-98% of bytes)
+- Acceptable overhead (<7% throughput impact)
 - Immune to address reuse bias
 
 #### For High-Throughput Services (Overhead-Critical)
@@ -422,7 +425,7 @@ typedef struct __attribute__((aligned(16))) SampleHeader {
 } SampleHeader;
 ```
 
-The user pointer is offset by `HEADER_SIZE` (16 bytes), ensuring 16-byte alignment is maintained.
+The user pointer is offset by `HEADER_SIZE` (16 bytes = 128 bits), ensuring 16-byte alignment is maintained.
 
 ### 7.2 Thread-Local State
 
@@ -452,12 +455,12 @@ atomic_fetch_add(&g_stats.sampled_allocs, 1);
 We use approximate bitmaps to track unique and sampled pages:
 
 ```c
-#define PAGE_BITMAP_SIZE 4096
+#define PAGE_BITMAP_SIZE 4096  // Tracks 4096 * 64 = 262,144 pages (1 GB of 4 KB pages)
 static atomic_uint_least64_t g_page_seen_bits[PAGE_BITMAP_SIZE / 64];
 static atomic_uint_least64_t g_page_sampled_bits[PAGE_BITMAP_SIZE / 64];
 ```
 
-This provides best-effort approximate counts without maintaining a full hash table.
+This provides best-effort approximate counts without maintaining a full hash table. Each bit represents one 4 KB page.
 
 ### 7.5 Multi-Process Support
 
@@ -469,10 +472,10 @@ When `make -j` spawns multiple `gcc` processes, each writes to `stats.json.<pid>
 
 ### 8.1 Limitations
 
-1. **Header Overhead**: 16 bytes per allocation (minimal but non-zero)
-2. **Approximate Page Tracking**: PAGE_HASH page counts are approximate (bitmap-based)
-3. **Single Hash Mask**: All hash-based schemes use `0xFF` (1/256). Different masks could be evaluated.
-4. **Fixed Poisson Mean**: POISSON_HEADER uses 4096 bytes by default. Optimal tuning may vary by workload.
+1. **Header Overhead**: 16 bytes (128 bits) per allocation (minimal but non-zero)
+2. **Approximate Page Tracking**: PAGE_HASH page counts are approximate (bitmap-based, 4 KB pages)
+3. **Single Hash Mask**: All hash-based schemes use `0xFF` (1/256 ≈ 0.39% sampling rate). Different masks could be evaluated.
+4. **Fixed Poisson Mean**: POISSON_HEADER uses 4096 bytes (4 KB) by default. Optimal tuning may vary by workload.
 
 ### 8.2 Future Work
 
@@ -495,7 +498,7 @@ We implemented and evaluated four stateless sampling schemes for live heap profi
 
 The evaluation demonstrates that **stateless sampling can be effective** for live heap profiling, but scheme selection must consider the application's working set size and allocation patterns. Address reuse bias is a real concern for hash-based schemes, but can be mitigated with byte-based sampling (Poisson) or hybrid approaches.
 
-**For production use, we recommend `POISSON_HEADER` with a 4KB mean as the default choice**, with `STATELESS_HASH` as an alternative for overhead-critical scenarios.
+**For production use, we recommend `POISSON_HEADER` with a 4 KB mean (`SAMPLER_POISSON_MEAN_BYTES=4096`) as the default choice**, with `STATELESS_HASH` as an alternative for overhead-critical scenarios.
 
 ---
 

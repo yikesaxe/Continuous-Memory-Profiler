@@ -1,0 +1,75 @@
+================================================================================
+Sample-Headers Experiments - Results Summary
+(Headers only on sampled allocations)
+================================================================================
+
+
+================================================================================
+Workload: HIGH-REUSE
+================================================================================
+
+Scheme: SAMPLE_HEADERS_EBPF_INSPIRED
+  Runs: 10
+  Total Allocations: 9850
+  Sampled Allocations: 326
+  Sample Rate (allocs): 0.033095 ± 0.000710 [p50: 0.033095]
+  Sample Rate (bytes): 0.046148 ± 0.002086
+  Dead Zone Rate: 0.0000 ± 0.0000
+  Peak Map Size: 11 ± 1 [max: 12]
+  Map Ops per 1k allocs: 1065.2 ± 1.4
+
+Scheme: SAMPLE_HEADERS_HASH_MAP
+  Runs: 10
+  Total Allocations: 9850
+  Sampled Allocations: 392
+  Sample Rate (allocs): 0.039811 ± 0.029820 [p50: 0.040056]
+  Sample Rate (bytes): 0.046229 ± 0.034773
+  Dead Zone Rate: 0.0000 ± 0.0000
+  Peak Map Size: 14 ± 7 [max: 21]
+  Map Ops per 1k allocs: 1078.8 ± 59.6
+
+Scheme: SAMPLE_HEADERS_POISSON_MAP
+  Runs: 10
+  Total Allocations: 9850
+  Sampled Allocations: 326
+  Sample Rate (allocs): 0.033095 ± 0.000710 [p50: 0.033095]
+  Sample Rate (bytes): 0.046148 ± 0.002086
+  Dead Zone Rate: 0.0000 ± 0.0000
+  Peak Map Size: 11 ± 1 [max: 12]
+  Map Ops per 1k allocs: 1065.2 ± 1.4
+
+
+================================================================================
+Workload: MONOTONIC
+================================================================================
+
+Scheme: SAMPLE_HEADERS_EBPF_INSPIRED
+  Runs: 10
+  Total Allocations: 10004
+  Sampled Allocations: 3728
+  Sample Rate (allocs): 0.372651 ± 0.007059 [p50: 0.372651]
+  Sample Rate (bytes): 0.478935 ± 0.008620
+  Dead Zone Rate: 0.0000 ± 0.0000
+  Peak Map Size: 3728 ± 70 [max: 3794]
+  Map Ops per 1k allocs: 1676.1 ± 14.9
+
+Scheme: SAMPLE_HEADERS_HASH_MAP
+  Runs: 10
+  Total Allocations: 10004
+  Sampled Allocations: 221
+  Sample Rate (allocs): 0.022081 ± 0.007441 [p50: 0.022591]
+  Sample Rate (bytes): 0.007671 ± 0.002470
+  Dead Zone Rate: 0.0000 ± 0.0000
+  Peak Map Size: 221 ± 74 [max: 344]
+  Map Ops per 1k allocs: 992.2 ± 14.7
+
+Scheme: SAMPLE_HEADERS_POISSON_MAP
+  Runs: 10
+  Total Allocations: 10004
+  Sampled Allocations: 3728
+  Sample Rate (allocs): 0.372651 ± 0.007059 [p50: 0.372651]
+  Sample Rate (bytes): 0.478935 ± 0.008620
+  Dead Zone Rate: 0.0000 ± 0.0000
+  Peak Map Size: 3728 ± 70 [max: 3794]
+  Map Ops per 1k allocs: 1676.1 ± 14.9
+
