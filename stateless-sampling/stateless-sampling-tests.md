@@ -263,23 +263,8 @@ We developed `pack_results.py` to:
 
 ## 5. Results and Analysis
 
-### 5.1 Synthetic: Monotonic Workload
 
-| Scheme | Runs | Avg Sample Rate (allocs, ratio) | Avg Sample Rate (bytes, ratio) | Std (allocs) | p50 (ratio) | p95 (ratio) | p99 (ratio) | Avg Windows Zero Sampled (count) |
-|--------|------|--------------------------------|--------------------------------|--------------|-------------|-------------|-------------|----------------------------------|
-| STATELESS_HASH | 60 | 0.003963 | 0.003956 | 0.000210 | 0.003955 | 0.004280 | 0.004300 | 1.00 |
-| POISSON_HEADER | 80 | 0.004079 | 0.008184 | 0.000276 | 0.004030 | 0.004490 | 0.004490 | 1.00 |
-| PAGE_HASH | 60 | 0.003925 | 0.003911 | 0.000148 | 0.003910 | 0.004170 | 0.004270 | 1.00 |
-| HYBRID | 60 | 0.003723 | 0.003795 | 0.000213 | 0.003715 | 0.004100 | 0.004240 | 1.00 |
-
-*Note: Sample rates are ratios (0.0-1.0), where 0.003904 = 0.3904% of allocations. Percentiles (p50/p95/p99) refer to allocation sampling rate. For POISSON_HEADER, mean was set to 524,288 (512 KB).*
-
-**Key Observations**:
-- All schemes achieve ~0.4% allocation sampling.
-- `POISSON_HEADER` now shows expected statistical variance (std: 0.000276), confirming its stochastic nature.
-- `STATELESS_HASH` shows consistent performance in this monotonic workload.
-
-### 5.2 Synthetic: High Reuse Workload
+### 5.1 High Reuse Workload
 
 | Scheme | Runs | Avg Sample Rate (allocs, ratio) | Avg Sample Rate (bytes, ratio) | Std (allocs) | p50 (ratio) | p95 (ratio) | p99 (ratio) | Avg Approx Unique Pages (count, 4 KB) | Avg Approx Sampled Pages (count, 4 KB) |
 |--------|------|--------------------------------|--------------------------------|--------------|-------------|-------------|-------------|--------------------------------------|----------------------------------------|
@@ -290,12 +275,8 @@ We developed `pack_results.py` to:
 
 *Note: Sample rates are ratios (0.0-1.0). Percentiles (p50/p95/p99) refer to allocation sampling rate. Pages are counts of 4 KB pages. For POISSON_HEADER and HYBRID, mean was set to 65,536 (64 KB).*
 
-**Key Observations**:
-- **Poisson Variance**: With proper seeding (avoiding identical `time(NULL)` seeds), `POISSON_HEADER` shows expected statistical variance (std: 0.000121), confirming it is a stochastic process.
-- **PAGE_HASH Sensitivity**: `PAGE_HASH` still shows extreme behavior. Most runs (p50, p95) have **0% sampling**, but some runs hit sampled pages, driving the average up and p99 to ~13%. This confirms its "all-or-nothing" fragility on small working sets.
-- `STATELESS_HASH` continues to show high variance due to address reuse.
 
-### 5.3 Real-World: Curl Compilation
+### 5.2 Curl Compilation
 
 | Scheme | Runs | Avg Sample Rate (bytes, ratio) | Std | p50 (ratio) | p95 (ratio) | p99 (ratio) |
 |--------|------|-------------------------------|-----|-------------|-------------|-------------|
@@ -304,17 +285,9 @@ We developed `pack_results.py` to:
 | PAGE_HASH | 10 | 0.000839 | 0.001770 | 0.000000 | 0.004197 | 0.004197 |
 | HYBRID | 10 | 0.013848 | 0.001896 | 0.012938 | 0.017254 | 0.017254 |
 
-*Note: Sample rates are ratios (0.0-1.0), where 0.407214 = 40.7% of bytes. Percentiles (p50/p95/p99) are also ratios.*
+*Note: Sample rates are ratios (0.0-1.0), where 0.407214 = 40.7% of bytes*
 
-**Key Observations**:
-- `POISSON_HEADER` achieves **~40% byte sampling** (p50: 0.407 = 40.7%), making it highly effective for profiling
-- `STATELESS_HASH` achieves only **~0.1% byte sampling** (p50: 0.000756 = 0.0756%), with higher variance
-- `PAGE_HASH` shows zero sampling in some runs (p50 = 0.000000), indicating occasional blindness
-- `HYBRID` achieves ~1.4% byte sampling, a middle ground
-
-**Why the difference?** `POISSON_HEADER` samples based on bytes allocated, so large allocations (common in compilation) are more likely to trigger samples. `STATELESS_HASH` samples based on address, so it misses many large allocations if their addresses don't hash correctly.
-
-### 5.4 Real-World: Memcached Performance
+### 5.3 Memcached Performance
 
 | Scheme | Runs | Avg Ops/sec | Std | p50 (ops/sec) | p95 (ops/sec) | p99 (ops/sec) | Avg Latency (ms) | Std | p50 (ms) | p95 (ms) | p99 (ms) |
 |--------|------|-------------|-----|---------------|---------------|---------------|------------------|-----|----------|----------|----------|
@@ -324,23 +297,6 @@ We developed `pack_results.py` to:
 | STATELESS_HASH | 5 | 1160.50 | 77.97 | 1160.00 | 1280.00 | 1280.00 | 0.248 | 0.004 | 0.248 | 0.252 | 0.252 |
 
 *Note: Throughput in operations/second (ops/sec). Latency in milliseconds (ms). Percentiles (p50/p95/p99) use the same units as their respective metrics.*
-
-**Key Observations**:
-- **Overhead is minimal**: < 7% difference between best (`POISSON_HEADER`) and worst (`STATELESS_HASH`)
-- All schemes show similar latency (~0.24-0.25 ms)
-- `POISSON_HEADER` has the highest throughput (p50: 1234.50 ops/sec), despite having more sampling overhead
-- Variance is low across all schemes (std < 80 ops/sec)
-
-**Conclusion**: Performance overhead is acceptable for all schemes. The sampling decision overhead is negligible compared to the actual allocation/deallocation cost.
-
-### 5.5 Dead Zone Analysis
-
-The `windows_zero_sampled` metric counts windows of 100,000 allocations where zero samples occurred (count). This is a proxy for sampling bias.
-
-**Findings**:
-- **Monotonic workload**: All schemes show `windows_zero_sampled = 1.0` (expected for a single-window workload)
-- **High-reuse workload**: `PAGE_HASH` shows complete blindness (0% sampling), while other schemes maintain coverage
-- **Real-world workloads**: Generally low dead-zone counts, indicating good coverage
 
 ---
 
