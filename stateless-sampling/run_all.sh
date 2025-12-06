@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Configuration
-SYNTH_RUNS=10
-REAL_RUNS=5
+SYNTH_RUNS=1
+REAL_RUNS=0
 
 # Build everything
 echo "Building project..."
@@ -23,14 +23,12 @@ echo "========================================="
 # 1. Synthetic Benchmarks - Monotonic
 echo ""
 echo "=== Synthetic: Monotonic Workload ==="
-for scheme in STATELESS_HASH POISSON_HEADER PAGE_HASH HYBRID; do
+for scheme in NONE STATELESS_HASH POISSON; do
     echo "  Scheme: $scheme"
     
     # Set Poisson mean based on scheme
-    if [[ "$scheme" == "POISSON_HEADER" ]]; then
-        MEAN="524288"
-    elif [[ "$scheme" == "HYBRID" ]]; then
-        MEAN="65536"
+    if [[ "$scheme" == "POISSON" ]]; then
+        MEAN="1024"
     else
         MEAN=""
     fi
@@ -48,8 +46,8 @@ for scheme in STATELESS_HASH POISSON_HEADER PAGE_HASH HYBRID; do
           SAMPLER_STATS_FILE="/tmp/test_mono_${scheme}_run${i}.json" \
           $MEAN_ENV \
           LD_PRELOAD=./sampler/libsampler.so \
-          ./bench/bench_alloc_patterns 1 100000 16 4096 > /dev/null 2>&1
-        
+          ./bench/bench_alloc_patterns 1 100000 16 4096 > "res/${scheme}_mono_${i}.log" 
+          python3 agg_live_heap.py "res/${scheme}_mono_${i}.log" 5  > "res/${scheme}_mono_${i}_histogram.txt"
         echo " done"
     done
 done
@@ -57,12 +55,12 @@ done
 # 2. Synthetic Benchmarks - High Reuse
 echo ""
 echo "=== Synthetic: High Reuse Workload ==="
-for scheme in STATELESS_HASH POISSON_HEADER PAGE_HASH HYBRID; do
+for scheme in NONE STATELESS_HASH POISSON; do
     echo "  Scheme: $scheme"
     
     # Set Poisson mean based on scheme
-    if [[ "$scheme" == "POISSON_HEADER" ]] || [[ "$scheme" == "HYBRID" ]]; then
-        MEAN="65536"
+    if [[ "$scheme" == "POISSON" ]] || [[ "$scheme" == "HYBRID" ]]; then
+        MEAN="1024"
     else
         MEAN=""
     fi
@@ -80,16 +78,18 @@ for scheme in STATELESS_HASH POISSON_HEADER PAGE_HASH HYBRID; do
           SAMPLER_STATS_FILE="/tmp/test_reuse_${scheme}_run${i}.json" \
           $MEAN_ENV \
           LD_PRELOAD=./sampler/libsampler.so \
-          ./bench/bench_alloc_patterns 4 100 100000 16 256 > /dev/null 2>&1
+          ./bench/bench_alloc_patterns 2 100 100000 16 256 > "res2/${scheme}_reuse_${i}.log" 
+          python3 agg_live_heap.py "res2/${scheme}_reuse_${i}.log" 5 > "res2/${scheme}_reuse_${i}_histogram.txt"
         
         echo " done"
     done
 done
 
+: << 'COMMENT_BLOCK'
 # 3. Real Workload - Curl Compilation
 echo ""
 echo "=== Real-World: Curl Compilation ==="
-for scheme in STATELESS_HASH POISSON_HEADER PAGE_HASH HYBRID; do
+for scheme in NONE STATELESS_HASH POISSON; do
     echo "  Scheme: $scheme"
     
     # Set Poisson mean based on scheme
@@ -119,6 +119,7 @@ for scheme in STATELESS_HASH POISSON_HEADER PAGE_HASH HYBRID; do
         echo " done"
     done
 done
+
 
 # 4. Real Workload - Memcached
 echo ""
@@ -273,3 +274,4 @@ python3 pack_results.py
 
 echo ""
 echo "Done. See results_package.txt and results/plots/"
+COMMENT_BLOCK

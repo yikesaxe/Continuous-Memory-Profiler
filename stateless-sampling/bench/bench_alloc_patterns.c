@@ -1,10 +1,16 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <time.h>
+#include <dlfcn.h>
+#include <unistd.h>
+#include <stdatomic.h>
 #include <string.h>
-
+#include <math.h>
+#include <pthread.h>
+#include <errno.h>
+#include <stdint.h>
+#include <malloc.h>
+#include <stdbool.h>
 /*
  * Synthetic Benchmark for Memory Allocator Sampling
  * 
@@ -27,11 +33,15 @@ static size_t rand_size(size_t min, size_t max) {
 // Workload 1: Monotonic Heap with Leaks
 // Allocates N items. Frees 95% of them. Leaks 5%.
 void workload_monotonic_leaks(int N, size_t min_size, size_t max_size) {
-    printf("Running Workload 1: Monotonic with Leaks (N=%d)\n", N);
-    
     void **ptrs = malloc(N * sizeof(void*));
     if (!ptrs) abort();
 
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    printf("START, %ld.%09ld, -1, -1\n",
+        ts.tv_sec, ts.tv_nsec
+    );
+    
     // Allocate all
     for (int i = 0; i < N; i++) {
         ptrs[i] = malloc(rand_size(min_size, max_size));
@@ -46,17 +56,27 @@ void workload_monotonic_leaks(int N, size_t min_size, size_t max_size) {
         if (ptrs[i]) free(ptrs[i]);
     }
     
-    printf("  Finished. Leaked %d objects.\n", N - cutoff);
+    clock_gettime(CLOCK_REALTIME, &ts);
+
+    printf("END, %ld.%09ld, -1, -1\n",
+        ts.tv_sec, ts.tv_nsec
+    );
     free(ptrs); // The array itself is freed, but the leaked pointers are lost
 }
 
 // Workload 2: Steady State Pool with Leaks
 void workload_steady_leaks(int iterations, int pool_size, size_t min_size, size_t max_size, int alloc_prob_percent) {
-    printf("Running Workload 2: Steady Pool (Iter=%d, Pool=%d)\n", iterations, pool_size);
-
     void **pool = calloc(pool_size, sizeof(void*));
     // To track which indices are "leaked" (permanently occupied)
     bool *leaked = calloc(pool_size, sizeof(bool));
+
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+
+    printf("START, %ld.%09ld, -1, -1\n",
+        ts.tv_sec, ts.tv_nsec
+    );
+
 
     for (int i = 0; i < iterations; i++) {
         // Iterate through pool
@@ -100,7 +120,11 @@ void workload_steady_leaks(int iterations, int pool_size, size_t min_size, size_
         }
     }
 
-    printf("  Finished.\n");
+    clock_gettime(CLOCK_REALTIME, &ts);
+
+    printf("END, %ld.%09ld, -1, -1\n",
+        ts.tv_sec, ts.tv_nsec
+    );
     free(leaked);
     free(pool);
 }

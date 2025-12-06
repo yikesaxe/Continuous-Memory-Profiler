@@ -37,7 +37,7 @@ typedef struct __attribute__((aligned(16))) SampleHeader {
 typedef enum SamplingScheme {
     SCHEME_NONE = 0,
     SCHEME_STATELESS_HASH = 1,
-    SCHEME_POISSON_HEADER = 2,
+    SCHEME_POISSON = 2,
     SCHEME_HYBRID_SMALL_POISSON_LARGE_HASH = 3,
     SCHEME_PAGE_HASH = 4
 } SamplingScheme;
