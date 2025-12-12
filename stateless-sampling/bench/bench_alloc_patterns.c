@@ -181,6 +181,33 @@ void workload_high_reuse(int num_hot_slots, int iterations, size_t min_size, siz
     free(leaky);
 }
 
+void leaky_function() {
+    for (int i = 0; i < 10000; i++) {
+        void *ptr = malloc(rand_size(16, 4096));
+        // 10% free
+        if (ptr && i % 10 == 0) {
+            free(ptr);
+        }
+
+        // 50% free
+        // if (ptr && i % 2 == 0) {
+        //     free(ptr);
+        // }
+
+        // 90% free
+        // if (ptr && i % 10 != 0) {
+        //     free(ptr);
+        // }
+    }
+}
+
+// Workload 4: Repeat Leaks
+void workload_repeat_leaks() {
+    for (int i = 0; i < 10; i++) {
+        leaky_function();
+    }
+}
+
 int main(int argc, char **argv) {
     srand(time(NULL));
 
@@ -208,6 +235,8 @@ int main(int argc, char **argv) {
         size_t max = parse_int(argv[5]);
         int prob = parse_int(argv[6]);
         workload_steady_leaks(iter, pool, min, max, prob);
+    } else if (mode == 3) {
+        workload_repeat_leaks();
     } else if (mode == 4) { // Matches prompt "Workload 3" but user asked for cmd "./bench 4"
         if (argc < 6) return 1;
         int slots = parse_int(argv[2]);
