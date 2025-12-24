@@ -1,14 +1,16 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -g
 
-TARGET = bench_alloc_patterns
-SRC = bench_alloc_patterns.c
+TARGETS = bench_alloc_patterns bench_sampling_overhead
 
-all: $(TARGET)
+all: $(TARGETS)
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $@ $(SRC)
+bench_alloc_patterns: bench_alloc_patterns.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+bench_sampling_overhead: bench_sampling_overhead.c
+	$(CC) $(CFLAGS) -o $@ $< -lm
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGETS)
 

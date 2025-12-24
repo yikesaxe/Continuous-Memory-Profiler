@@ -2,14 +2,16 @@ CC = gcc
 CFLAGS = -Wall -Wextra -O2 -fPIC -g
 LDFLAGS = -shared -ldl -lpthread -lm
 
-TARGET = libsampler.so
-SRC = sampler.c
+TARGETS = libsampler.so libsampler_timed.so
 
-all: $(TARGET)
+all: $(TARGETS)
 
-$(TARGET): $(SRC) sampler.h
-	$(CC) $(CFLAGS) -o $@ $(SRC) $(LDFLAGS)
+libsampler.so: sampler.c sampler.h
+	$(CC) $(CFLAGS) -o $@ sampler.c $(LDFLAGS)
+
+libsampler_timed.so: sampler_timed.c sampler.h
+	$(CC) $(CFLAGS) -o $@ sampler_timed.c $(LDFLAGS)
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGETS)
 
